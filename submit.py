@@ -1,5 +1,6 @@
 import time
-from condor import parse_arguments, os, generate_geant4_macros, generate_seeds, generate_condor_submit
+import os
+from condor import parse_arguments, generate_geant4_macros, generate_seeds, generate_condor_submit, submit_condor_job
 
 # Define the main function
 def main():

@@ -16,7 +16,7 @@ To use the `submit.py` script, run it from the command line with the required pa
 - `--macros_folder`: The path to the folder where generated GEANT4 macros will be saved.
 - `--isotope`: The name of the isotope used in the simulation.
 - `--position`: The position string specifying the position of the particle source.
-- `--confine`: The name of the confinement for the particle source.
+- `--confine`: The name of the confinement volume for the particle source.
 - `--num_events`: The number of events to be simulated in each macro.
 - `--times`: The number of times to generate and submit the macro, allowing for multiple simulations with different parameters.
 

@@ -360,7 +360,7 @@ def submit_condor_job(submit_folder, timestamp, isotope=None, confine=None):
 
     # Execute condor_submit command with spooling and capture output
     try:
-        output = subprocess.check_output(["condor_submit", "-spool", submit_file], text=True)
+        output = subprocess.check_output(["condor_submit", "-spool", submit_file]) #text=True
         # Extract job ID from the output
         job_id = output.split()[-1]
         print(f"Submitted job {job_id}")

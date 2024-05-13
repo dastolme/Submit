@@ -1,18 +1,7 @@
 import os
-import argparse
 import subprocess
 import time
 from radioactivedecay.nuclide import Nuclide
-
-def parse_arguments():
-    parser = argparse.ArgumentParser(description="Generate GEANT4 macros.")
-    parser.add_argument("--macros_folder", required=True, help="Path to the folder to save the generated macros.")
-    parser.add_argument("--isotope", required=True, help="Isotope name.")
-    parser.add_argument("--position", required=True, help="Position string.")
-    parser.add_argument("--confine", required=True, help="Confinement name.")
-    parser.add_argument("--num_events", type=int, required=True, help="Number of events.")
-    parser.add_argument("--times", type=int, default=1, help="Number of times to submit the macro.")
-    return parser.parse_args()
 
 def generate_seeds():
     # Get current time in milliseconds
@@ -74,13 +63,22 @@ def generate_geant4_macros(macros_folder, isotope, position, confine, seed1, see
     halfx, halfy, halfz = position.split()
 
     # Define the output file name with timestamp
-    output_file = f"{isotope}_{confine}_{timestamp}.root"
+    output_file = f"{isotope}_{confine}_{timestamp}"
 
     # Define the content of the GEANT4 macro
     macro_content = f"""
 # GENERATION OF RADIOACTIVE PARTICLES
 
 /run/initialize
+
+"""
+
+    # Add nucleusLimits for U238
+    if isotope == "U238":
+        macro_content += "/grdm/nucleusLimits 230 238 90 92\n"
+
+    # Append the rest of the macro content
+    macro_content += f"""
 
 # define particle or ion
 /gps/particle ion
@@ -120,6 +118,52 @@ def generate_geant4_macros(macros_folder, isotope, position, confine, seed1, see
     with open(os.path.join(macros_folder, f"{isotope}_{confine}_{timestamp}.mac"), "w") as f:
         f.write(macro_content)
 
+def generate_geant4_gamma_bkg(macros_folder, num_events, seed1, seed2):
+    # Ensure the macros folder exists
+    os.makedirs(macros_folder, exist_ok=True)
+    
+    # Define the output file name for the gamma background macro
+    output_file = "gamma_bkg"
+
+    # Define the content of the GEANT4 gamma background macro
+    macro_content = f"""
+/run/initialize
+
+# GENERATION OF GAMMAS
+/gps/particle gamma
+/gps/pos/type Surface
+/gps/pos/shape Sphere
+/gps/pos/centre 0. 0. 0. m
+/gps/pos/radius 3.3 m
+/gps/ang/type iso
+
+# FIXME : check normalization
+#########       energy [MeV]   counts/keV/sec in Hall C @LNGS  
+/gps/hist/point 0.003711068   0.239576347412
+/gps/hist/point 0.024236996   0.567445723826
+... (truncated for brevity)
+/gps/hist/point 2.795237276   0.00120586576321
+/gps/hist/point 2.815763204   0.000902168592194
+/gps/hist/point 2.836289132   0.000638594111615
+
+# DEBUG OPTIONS
+/run/verbose 0
+/event/verbose 0
+/tracking/verbose 0
+/CYGNO/reportingfrequency 100000
+#Output file name
+/CYGNO/outfile {output_file}
+/random/setSeeds {seed1} {seed2}
+
+# define number of events to be generated
+/run/beamOn {num_events}
+"""
+
+    # Write the macro content to a file
+    with open(os.path.join(macros_folder, f"gamma_background.mac"), "w") as f:
+        f.write(macro_content)
+
+
 def generate_condor_submit(submit_folder, isotope, confine, timestamp):
     # Ensure the submit folder exists
     os.makedirs(submit_folder, exist_ok=True)
@@ -148,6 +192,31 @@ queue
     with open(os.path.join(submit_folder, f"{isotope}_{confine}_{timestamp}.submit"), "w") as f:
         f.write(submit_content)
 
+def generate_condor_submit_gamma_background(submit_folder, timestamp):
+    # Ensure the submit folder exists
+    os.makedirs(submit_folder, exist_ok=True)
+
+    # Define the content of the Condor submit file for gamma background
+    submit_content = f"""
+universe   = vanilla
+executable = /path/to/gamma_background_executable
+arguments  = --macros_folder /path/to/macros_folder --num_events 1000000 --times 1
+
+log        = gamma_background_{timestamp}.log
+output     = gamma_background_{timestamp}.out
+error      = gamma_background_{timestamp}.error
+
+getenv = True
+transfer_input_files = /path/to/gamma_background_files
+transfer_output_files  = gamma_background_{timestamp}.root
+
+queue
+"""
+
+    # Write the submit content to a file
+    with open(os.path.join(submit_folder, f"submit_gamma_background_{timestamp}.submit"), "w") as f:
+        f.write(submit_content)
+
 def submit_condor_job(submit_folder, isotope, confine, timestamp):
     # Path to the Condor submit file
     submit_file = os.path.join(submit_folder, f"{isotope}_{confine}_{timestamp}.submit")
@@ -167,31 +236,36 @@ def submit_condor_job(submit_folder, isotope, confine, timestamp):
         print(f"Error submitting job: {e}")
         return None
     
-def check_jobs(job_ids_file):
-    try:
-        # Read job IDs and macro file names from the job IDs file
-        with open(job_ids_file, 'r') as f:
-            lines = f.readlines()
+def check_jobs(log_files):
+    for log_file in log_files:
+        try:
+            # Read job IDs and macro file names from the log file
+            with open(log_file, 'r') as f:
+                lines = f.readlines()
 
-        for line in lines:
-            job_id, macro_file = line.strip().split('\t')
-            # Run condor_q command to check job status
-            result = subprocess.run(["condor_q", job_id], capture_output=True, text=True)
-            if "not found" in result.stdout:
-                print(f"Job {job_id} associated with {macro_file} is not found.")
-            else:
-                print(f"Job {job_id} associated with {macro_file} is still running.")
+            for line in lines:
+                # Split the line by tabs to extract job ID and macro file name
+                job_info = line.strip().split('\t')
+                job_id = job_info[-1]  # Last element is the job ID
+                macro_file = job_info[-2]  # Second to last element is the macro file name
+                
+                # Run condor_q command to check job status
+                result = subprocess.run(["condor_q", job_id], capture_output=True, text=True)
+                if "not found" in result.stdout:
+                    print(f"Job {job_id} associated with {macro_file} is not found.")
+                else:
+                    print(f"Job {job_id} associated with {macro_file} is still running.")
 
-                # Check if the job has finished
-                if "not found" not in result.stdout:
-                    # Run condor_transfer_data to retrieve output files
-                    subprocess.run(["condor_transfer_data", job_id])
-                    # Remove the job from the Condor queue
-                    subprocess.run(["condor_rm", job_id])
-                    print(f"Job {job_id} associated with {macro_file} has finished.")
+                    # Check if the job has finished
+                    if "not found" not in result.stdout:
+                        # Run condor_transfer_data to retrieve output files
+                        subprocess.run(["condor_transfer_data", job_id])
+                        # Remove the job from the Condor queue
+                        subprocess.run(["condor_rm", job_id])
+                        print(f"Job {job_id} associated with {macro_file} has finished.")
 
-    except FileNotFoundError:
-        print(f"Job IDs file {job_ids_file} not found.")
-    except Exception as e:
-        print(f"An error occurred: {e}")
+        except FileNotFoundError:
+            print(f"Log file {log_file} not found.")
+        except Exception as e:
+            print(f"An error occurred: {e}")
 

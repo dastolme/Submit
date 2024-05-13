@@ -349,9 +349,14 @@ queue
     with open(os.path.join(submit_folder, f"submit_gamma_background_{timestamp}.submit"), "w") as f:
         f.write(submit_content)
 
-def submit_condor_job(submit_folder, isotope, confine, timestamp):
+def submit_condor_job(submit_folder, timestamp, isotope=None, confine=None):
+    # Construct the submit file name based on provided arguments
+    submit_file_name = f"{isotope}_" if isotope else ""
+    submit_file_name += f"{confine}_" if confine else ""
+    submit_file_name += f"{timestamp}.submit"
+    
     # Path to the Condor submit file
-    submit_file = os.path.join(submit_folder, f"{isotope}_{confine}_{timestamp}.submit")
+    submit_file = os.path.join(submit_folder, submit_file_name)
 
     # Execute condor_submit command with spooling and capture output
     try:

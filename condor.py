@@ -331,22 +331,22 @@ def generate_condor_submit_gamma_background(submit_folder, timestamp):
     # Define the content of the Condor submit file for gamma background
     submit_content = f"""
 universe   = vanilla
-executable = /path/to/gamma_background_executable
-arguments  = --macros_folder /path/to/macros_folder --num_events 1000000 --times 1
+executable = /jupyter-workspace/private/CYGNO_04/CYGNO-MC-build/run_simulation.sh
+arguments  = gamma_background_{timestamp}.mac
 
 log        = gamma_background_{timestamp}.log
 output     = gamma_background_{timestamp}.out
 error      = gamma_background_{timestamp}.error
 
 getenv = True
-transfer_input_files = /path/to/gamma_background_files
+transfer_input_files = /jupyter-workspace/private/CYGNO_04/CYGNO-MC-build/CYGNO, /jupyter-workspace/private/CYGNO_04/CYGNO-MC-build/macros, /jupyter-workspace/private/CYGNO_04/geometry, /usr/local/lib/libcadmesh.so
 transfer_output_files  = gamma_background_{timestamp}.root
 
 queue
 """
 
     # Write the submit content to a file
-    with open(os.path.join(submit_folder, f"submit_gamma_background_{timestamp}.submit"), "w") as f:
+    with open(os.path.join(submit_folder, f"{timestamp}.submit"), "w") as f:
         f.write(submit_content)
 
 def submit_condor_job(submit_folder, timestamp, isotope=None, confine=None):

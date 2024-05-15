@@ -37,7 +37,7 @@ def main():
             seed1, seed2 = generate_seeds()
 
             # Call the function to generate macros
-            generate_geant4_gamma_bkg(args.macros_folder, seed1, seed2, args.num_events, timestamp)
+            generate_geant4_gamma_bkg(args.macros_folder, args.num_events, seed1, seed2, timestamp)
 
             # Generate Condor submit file
             generate_condor_submit_gamma_background(submit_folder, timestamp)

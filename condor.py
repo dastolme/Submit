@@ -123,7 +123,7 @@ def generate_geant4_gamma_bkg(macros_folder, num_events, seed1, seed2, timestamp
     os.makedirs(macros_folder, exist_ok=True)
     
     # Define the output file name for the gamma background macro
-    output_file = f"gamma_bkg_{timestamp}"
+    output_file = f"gamma_background_{timestamp}"
 
     # Define the content of the GEANT4 gamma background macro
     macro_content = f"""
@@ -332,7 +332,7 @@ def generate_condor_submit_gamma_background(submit_folder, timestamp):
     submit_content = f"""
 universe   = vanilla
 executable = /jupyter-workspace/private/CYGNO_04/CYGNO-MC-build/run_simulation.sh
-arguments  = gamma_background_{timestamp}.mac
+arguments  = {timestamp}.mac
 
 log        = gamma_background_{timestamp}.log
 output     = gamma_background_{timestamp}.out
@@ -341,6 +341,9 @@ error      = gamma_background_{timestamp}.error
 getenv = True
 transfer_input_files = /jupyter-workspace/private/CYGNO_04/CYGNO-MC-build/CYGNO, /jupyter-workspace/private/CYGNO_04/CYGNO-MC-build/macros, /jupyter-workspace/private/CYGNO_04/geometry, /usr/local/lib/libcadmesh.so
 transfer_output_files  = gamma_background_{timestamp}.root
+
++CygnoUser = "$ENV(USERNAME)"
++OWNER = "condor"
 
 queue
 """
